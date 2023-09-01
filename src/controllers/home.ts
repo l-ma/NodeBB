@@ -8,7 +8,8 @@ import { SettingsObject } from '../types';
 
 type Configr = {
     homePageRoute: string,
-    homePageCustom: string
+    homePageCustom: string,
+    allowUserHomePage: string
 }
 
 export function adminHomePageRoute(): string {
@@ -29,18 +30,32 @@ export async function getUserHomeRoute(uid: number): Promise<string> {
     return route;
 }
 
-////
+type ComposerData = {
+    req: Request<object, object, ComposerData>,
+    uid: number,
+    timestamp: number,
+    content: string,
+    fromQueue: boolean,
+    tid?: number,
+    cid?: number,
+    title?: string,
+    tags?: string[],
+    thumb?: string,
+    noscript?: string
+}
 
-async function rewrite(req, res, next) {
+export async function rewrite(req: Request<object, object,
+    ComposerData> & { uid: number }, res: Response<object, Locals>, next: NextFunction): Promise<void> {
     if (req.path !== '/' && req.path !== '/api/' && req.path !== '/api') {
         return next();
     }
     let route = adminHomePageRoute();
-    if (meta.config.allowUserHomePage) {
+    const con: Configr = meta.config as Configr;
+    if (con.allowUserHomePage) {
         route = await getUserHomeRoute(req.uid);
     }
 
-    let parsedUrl;
+    let parsedUrl: url.UrlWithParsedQuery;
     try {
         parsedUrl = url.parse(route, true);
     } catch (err) {
@@ -59,16 +74,18 @@ async function rewrite(req, res, next) {
     next();
 }
 
-exports.rewrite = rewrite;
+type NewType = object;
 
-function pluginHook(req, res, next) {
+type Locals = {
+    homePageRoute: string;
+}
+
+export async function pluginHook(req: Request, res: Response<NewType, Locals>, next: NextFunction) {
     const hook = `action:homepage.get:${res.locals.homePageRoute}`;
 
-    plugins.hooks.fire(hook, {
+    await plugins.hooks.fire(hook, {
         req: req,
         res: res,
         next: next,
     });
 }
-
-exports.pluginHook = pluginHook;
